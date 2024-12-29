@@ -10,11 +10,13 @@ public class Server {
     private int port;
     private List<ClientHandler> clients;
     private AuthenticatedProvider authenticatedProvider;
+    private ChatOperations chatOperations;
 
     public Server(int port) {
         this.port = port;
         clients = new CopyOnWriteArrayList<>();
         authenticatedProvider = new InMemoryAuthenticatedProvider(this);
+        chatOperations = (InMemoryAuthenticatedProvider)authenticatedProvider;
     }
 
     public void start() {
@@ -55,7 +57,20 @@ public class Server {
         return false;
     }
 
+    public ClientHandler getClientHanler(String username) {
+        for (ClientHandler c : clients) {
+            if (c.getUsername().equals(username)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
     public AuthenticatedProvider getAuthenticatedProvider() {
         return authenticatedProvider;
     }
+    public ChatOperations getChatOperations() {
+        return chatOperations;
+    }
+
 }

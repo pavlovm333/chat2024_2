@@ -70,7 +70,11 @@ public class ClientHandler {
                             sendMsg("/exitok");
                             break;
                         }
-
+                        String[] msgarray = message.split(" ", 2);
+                        if (msgarray[0].equals("/kick")) {
+                            server.getChatOperations().disconnectingFromChat (this, msgarray[1]);
+                        } else
+                            sendMsg("Ошибка: неверный формат сообщения\n" + username + " : " + message);
                     } else {
                         server.broadcastMessage(username + " : " + message);
                     }
