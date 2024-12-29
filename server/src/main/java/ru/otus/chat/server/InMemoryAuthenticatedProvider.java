@@ -3,17 +3,26 @@ package ru.otus.chat.server;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class InMemoryAuthenticatedProvider implements AuthenticatedProvider {
+public class InMemoryAuthenticatedProvider implements AuthenticatedProvider, ChatOperations {
 
     private class User {
         private String login;
         private String password;
         private String username;
+        private Role role;
+
+        public User(String login, String password, String username, Role role) {
+            this.login = login;
+            this.password = password;
+            this.username = username;
+            this.role = role;
+        }
 
         public User(String login, String password, String username) {
             this.login = login;
             this.password = password;
             this.username = username;
+            this.role = Role.USER;
         }
     }
 
@@ -26,6 +35,7 @@ public class InMemoryAuthenticatedProvider implements AuthenticatedProvider {
         users.add(new User("qwe", "qwe", "qwe1"));
         users.add(new User("asd", "asd", "asd1"));
         users.add(new User("zxc", "zxc", "zxc1"));
+        users.add(new User("adm", "mda", "Administrator", Role.ADMIN));
     }
 
     @Override
@@ -97,5 +107,25 @@ public class InMemoryAuthenticatedProvider implements AuthenticatedProvider {
         server.subscribe(clientHandler);
         clientHandler.sendMsg("/regok " + username);
         return true;
+    }
+
+    public void disconnectingFromChat(ClientHandler clientHandler, String username){
+        for (User u : users) {
+            if (u.username.equals(clientHandler.getUsername())) {
+                if (u.role != Role.ADMIN) {
+                    clientHandler.sendMsg("Недостаточно прав для выполнения команды");
+                    return;
+                } else {
+                    break;
+                }
+            }
+        }
+        ClientHandler c = server.getClientHanler(username);
+        if (c != null) {
+            c.sendMsg("Удален из чата: " + username);
+            c.disconnect();
+            return;
+        }
+        clientHandler.sendMsg("Ошибка: клиент с именем " + username + " не найден");
     }
 }
