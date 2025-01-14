@@ -1,5 +1,6 @@
 package ru.otus.chat.server;
 
+import java.sql.*;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -15,22 +16,51 @@ public class InMemoryAuthenticatedProvider implements AuthenticatedProvider {
             this.password = password;
             this.username = username;
         }
+
+        @Override
+        public String toString() {
+            return "User{" +
+                    "login=" + login +
+                    ", password='" + password + '\'' +
+                    ", username='" + username + '\'' +
+                    '}';
+        }
     }
+
+    private static final String DATABASE_URL = "jdbc:sqlite:chat2024_2.db";
+    private static final String USERS_QUERY = "select * from users;";
+    private static final String USERS_INSERT = "insert into users (login, password, name) values (?, ?, ?);";
+    private static final String USERS_TO_ROLES_INSERT = "insert into users_to_roles (user_id, role_id) values ((select seq from sqlite_sequence where name = 'users'), 3);";
+
+    private final Connection connection;
 
     private List<User> users;
     private Server server;
 
-    public InMemoryAuthenticatedProvider(Server server) {
+    public InMemoryAuthenticatedProvider(Server server) throws ClassNotFoundException, SQLException {
+        Class.forName("org.sqlite.JDBC");
+        this.connection = DriverManager.getConnection(DATABASE_URL);
         this.server = server;
         this.users = new CopyOnWriteArrayList<>();
-        users.add(new User("qwe", "qwe", "qwe1"));
-        users.add(new User("asd", "asd", "asd1"));
-        users.add(new User("zxc", "zxc", "zxc1"));
     }
 
     @Override
     public void initialize() {
-        System.out.println("Инициализация InMemoryAuthenticatedProvider");
+        try (Statement statement = connection.createStatement()) {
+            try (ResultSet resultSet = statement.executeQuery(USERS_QUERY)) {
+                while (resultSet.next()) {
+                    String login = resultSet.getString("login");
+                    String password = resultSet.getString("password");
+                    String name = resultSet.getString("name");
+                    User user = new User(login, password, name);
+                    users.add(user);
+                }
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+        System.out.println("Зарегистрированные пользователи");
+        System.out.println(users.toString());
     }
 
     private String getUsernameByLoginAndPassword(String login, String password) {
@@ -93,6 +123,22 @@ public class InMemoryAuthenticatedProvider implements AuthenticatedProvider {
             return false;
         }
         users.add(new User(login, password, username));
+
+        try (PreparedStatement prStatement = connection.prepareStatement(USERS_INSERT)) {
+            prStatement.setString(1, login);
+            prStatement.setString(2, password);
+            prStatement.setString(3, username);
+            prStatement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate(USERS_TO_ROLES_INSERT);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+
         clientHandler.setUsername(username);
         server.subscribe(clientHandler);
         clientHandler.sendMsg("/regok " + username);
